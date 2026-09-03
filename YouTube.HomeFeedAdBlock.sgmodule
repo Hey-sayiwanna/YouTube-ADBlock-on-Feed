@@ -1,0 +1,14 @@
+#!name=YouTube 首页去广告
+#!desc=针对 iOS / iPadOS YouTube 首页推荐流 Sponsored / Feed 广告的独立补丁。v9 会解析 /youtubei/v1/browse 的 protobuf，定位 Home Feed 广告项，识别 aboutthisad / pagead / doubleclick 等广告特征，删除完整广告卡片及相邻分隔，避免残留灰框或黑框。
+#!category=YouTube
+#!system=ios
+#!version=2026.09.03.9
+
+[Rule]
+AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
+
+[Script]
+YouTube.HomeFeedAdBlock.v9 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/browse(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=webview,debug=true,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.HomeFeedAdBlock.js?v=20260903.9
+
+[MITM]
+hostname = %APPEND% youtubei.googleapis.com
