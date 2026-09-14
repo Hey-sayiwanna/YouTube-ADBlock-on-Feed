@@ -1,0 +1,23 @@
+#!name=YouTube（music）去广告自制更新版
+#!desc=整合自制首页 Sponsored Feed 去广告与 Maasea YouTube (Music) Enhance（固定为 2026-09-03 之前最后版本）。本模块负责首页 Feed 广告、播放器广告、Shorts 广告、搜索/推荐流广告及 Enhance 原有功能；为避免与双语字幕冲突，字幕翻译默认关闭。
+#!category=YouTube
+#!system=ios
+#!version=2026.09.15.1
+#!arguments=屏蔽上传按钮:true,屏蔽选段按钮:true,屏蔽Shorts按钮:false,字幕翻译语言:off,启用调试模式:false
+#!arguments-desc=- 屏蔽参数：[true, false] \n- 翻译参数：[语言代码, off] \n\n1. 若同时使用 YouTube 双语字幕模块，请保持“字幕翻译语言=off”，不要启用 Enhance 内置字幕翻译。\n2. Maasea Enhance 代码固定为 2026-09-03 之前最后提交：65075cdb388fc5e3094afd7e7314c67b243f3525（2026-07-19）。\n3. 首页 /browse 由自制 Feed v9 独占处理，避免与 Enhance 的 browse response 重复匹配。
+
+[Rule]
+AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
+AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP)),REJECT
+
+[Script]
+# 自制首页 Sponsored / Feed 广告过滤：独占 browse，避免和 Enhance browse 脚本互相抢响应
+YouTube.HomeFeedAdBlock.v9 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/browse(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=webview,debug=true,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.HomeFeedAdBlock.js?v=20260903.9
+
+# Maasea YouTube (Music) Enhance：使用 2026-09-03 之前固定快照，刻意排除 browse，由上面的自制脚本接管
+YouTube.Enhance.response.pinned = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/(youtubei\/v1\/(next|player|search|reel\/reel_watch_sequence|guide|account\/get_setting|get_watch|log_event|config))(\?(.*))?$,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.response.js,argument="{\"captionLang\":\"{{{字幕翻译语言}}}\",\"blockUpload\":{{{屏蔽上传按钮}}},\"blockImmersive\":{{{屏蔽选段按钮}}},\"blockShorts\":{{{屏蔽Shorts按钮}}},\"debug\":{{{启用调试模式}}}}"
+YouTube.Enhance.request.init.pinned = type=http-request,pattern=^https?:\/\/[\w-]+\.googlevideo\.com\/initplayback.+&ack.*,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js,argument="{\"captionLang\":\"{{{字幕翻译语言}}}\"}"
+YouTube.Enhance.request.log_event.pinned = type=http-request,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/log_event,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js
+
+[MITM]
+hostname = %APPEND% *.googlevideo.com, youtubei.googleapis.com
