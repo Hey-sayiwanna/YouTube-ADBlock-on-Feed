@@ -1,10 +1,10 @@
 #!name=YouTube（music）去广告自制更新版
-#!desc=自制 protobuf 补丁处理 /browse 首页 Sponsored、/next 评论区/视频下方 Sponsored 与 /player/ad_break；其余接口继续使用固定版 Maasea Enhance。双语字幕完全独立。
+#!desc=固定 Maasea Enhance + 自制 protobuf 补丁。修复 /next 与 /player/ad_break 二进制响应输出键错误，并按 2026-09-15 实际 HAR 清理 /next 顶层广告容器 14/15/37/42。双语字幕完全独立。
 #!category=YouTube
 #!system=ios
-#!version=2026.09.15.9
+#!version=2026.09.15.10
 #!arguments=屏蔽上传按钮:true,屏蔽选段按钮:true,屏蔽Shorts按钮:false,启用调试模式:false
-#!arguments-desc=- 屏蔽参数：[true, false] \n\n1. 双语字幕继续由独立模块负责，本模块不处理 timedtext/caption。\n2. Maasea Enhance 固定为 65075cdb388fc5e3094afd7e7314c67b243f3525（2026-07-19）。\n3. /browse 由自制 Raw AdGuard 清理首页 Sponsored。\n4. /next 根据 2026-09-15 实际 HAR，仅在顶层 field 14 含广告证据时删除该 Sponsored 容器，保留评论/推荐等其它 protobuf 数据。\n5. /player/ad_break 使用独立响应过滤器返回空 protobuf，阻止播放过程广告负载。\n6. /player、/search、/reel、/guide、/get_watch、/log_event、/config 等继续使用固定 Maasea Enhance。\n7. captionLang 强制 off，避免与双语字幕模块功能重叠。\n8. 首页大响应脚本关闭 Surge debug，降低冷启动额外开销。
+#!arguments-desc=- 屏蔽参数：[true, false] \n\n1. 双语字幕继续由独立模块负责，本模块不处理 timedtext/caption。\n2. Maasea Enhance 固定为 65075cdb388fc5e3094afd7e7314c67b243f3525（2026-07-19）。\n3. /browse 继续由自制 Raw AdGuard 清理首页 Sponsored。\n4. /next v2 使用 Surge 正确的二进制 response body 输出，并只在检测到明确广告证据时删除顶层 field 14/15/37/42。\n5. /player/ad_break v2 同样改用正确的 binary response body 输出，返回空 protobuf 阻止独立广告 break。\n6. /player、/search、/reel、/guide、/get_watch、/log_event、/config 等继续使用固定 Maasea Enhance。\n7. captionLang 强制 off，避免与双语字幕模块功能重叠。\n8. 首页大响应脚本保持 debug=false，降低冷启动额外开销。
 
 [Rule]
 AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
@@ -12,8 +12,8 @@ AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP)),REJECT
 
 [Script]
 YouTube.RawAdGuard.v12 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/browse(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=webview,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.HomeFeedAdBlock.js?v=20260915.12
-YouTube.NextAdBlock.v1 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/next(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=webview,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.NextAdBlock.js?v=20260915.1
-YouTube.AdBreakBlock.v1 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/player\/ad_break(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.AdBreakBlock.js?v=20260915.1
+YouTube.NextAdBlock.v2 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/next(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=webview,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.NextAdBlock.js?v=20260915.2
+YouTube.AdBreakBlock.v2 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/player\/ad_break(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.AdBreakBlock.js?v=20260915.2
 YouTube.Enhance.response.pinned = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(player|search|reel\/reel_watch_sequence|guide|account\/get_setting|get_watch|log_event|config)(\?(.*))?$,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.response.js,argument="{\"captionLang\":\"off\",\"blockUpload\":{{{屏蔽上传按钮}}},\"blockImmersive\":{{{屏蔽选段按钮}}},\"blockShorts\":{{{屏蔽Shorts按钮}}},\"debug\":{{{启用调试模式}}}}"
 YouTube.Enhance.request.init.pinned = type=http-request,pattern=^https?:\/\/[\w-]+\.googlevideo\.com\/initplayback.+&ack.*,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js,argument="{\"captionLang\":\"off\"}"
 YouTube.Enhance.request.log_event.pinned = type=http-request,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/log_event,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js
