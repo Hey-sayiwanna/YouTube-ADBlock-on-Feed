@@ -28,7 +28,7 @@ jobs:
       - name: Commit vendored snapshot
         shell: bash
         run: |
-          if git diff --quiet -- Upstream/Maasea && git ls-files --error-unmatch Upstream/Maasea >/dev/null 2>&1; then
+          if [ -z "$(git status --porcelain -- Upstream/Maasea)" ]; then
             echo 'Snapshot already vendored.'
             exit 0
           fi
