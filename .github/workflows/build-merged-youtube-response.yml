@@ -37,13 +37,13 @@ jobs:
           src = src.replace(marker, helper + '\n' + marker, 1)
 
           old = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let t=e.msgType.fromBinary(l.bodyBytes),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey});return{action:n?"body":"exit",bodyBytes:n?e.msgType.toBinary(t):void 0,state:l.state,changed:i}}'
-          new = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let t=e.msgType.fromBinary(l.bodyBytes),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey}),r=n?e.msgType.toBinary(t):l.bodyBytes;if(e.path==="browse"){try{let c=YTCustomHomeFeedV9(r);c.changed&&(r=c.body,n=!0,console.log(`[YouTube merged browse] HomeFeed extra removed ads=${c.ads} shells=${c.shells} dividers=${c.dividers}`))}catch(c){console.log(`[YouTube merged browse] HomeFeed extra error: ${String(c)}`)}}return{action:n?"body":"exit",bodyBytes:n?r:void 0,state:l.state,changed:i}}'
+          new = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let a=l.bodyBytes,u=!1;if(e.path==="browse"){try{let c=YTCustomHomeFeedV9(a);c.changed&&(a=c.body,u=!0,console.log(`[YouTube merged browse] HomeFeed pre-filter removed ads=${c.ads} shells=${c.shells} dividers=${c.dividers}`))}catch(c){console.log(`[YouTube merged browse] HomeFeed pre-filter error: ${String(c)}`)}}let t=e.msgType.fromBinary(a),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey});return{action:n||u?"body":"exit",bodyBytes:n||u?e.msgType.toBinary(t):void 0,state:l.state,changed:i}}'
 
           if old not in src:
               raise SystemExit('Pinned Enhance dispatcher signature changed; refusing unsafe build')
           src = src.replace(old, new, 1)
 
-          banner = '/* GENERATED FILE: pinned Maasea Enhance browse first, then custom Home Feed v9 post-filter. */\n'
+          banner = '/* GENERATED FILE: custom Home Feed v9 pre-filter, then pinned Maasea Enhance browse. */\n'
           out_path.write_text(banner + src, encoding='utf-8')
           print(f'Wrote {out_path} ({out_path.stat().st_size} bytes)')
           PY
