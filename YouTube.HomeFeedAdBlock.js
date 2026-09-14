@@ -1,23 +1,23 @@
 /*
- * YouTube iOS 首页 Feed Sponsored 广告补丁 v9
+ * YouTube iOS Browse / Sponsored / player ad_break 广告补丁 v10
  *
- * v9 修复 v8 对广告端点特征判断过窄的问题。
- * 新抓到的 MyRepublic Sponsored item 仍位于 field #49399797 下的 field #1，
- * 但不再携带旧的 googleadservices.com/pagead/aclk、/pagead/adview 等组合，
- * 而是改成 paralleladinteraction、googleads.g.doubleclick.net/pagead/interaction，
- * 同时仍稳定带有 www.youtube.com/aboutthisad 与 yt3.ggpht.com/proxy。
+ * 目标：
+ * 1. 保留 v9 对首页 Home Feed Sponsored 广告的专用清理；
+ * 2. 恢复迁移前 Enhance 对非首页 /browse 中广告 item 的广泛过滤能力；
+ * 3. 处理新版 /youtubei/v1/player/ad_break 伴随广告（视频下方“赞助”卡片）。
  *
- * 新策略：
- * - 继续在前 8 层寻找 Home Feed 容器 field #49399797；
- * - 对直接 field #1 / #32 item：
- *   1) 只要包含 www.youtube.com/aboutthisad，直接判定为 Sponsored；
- *   2) 或者命中 >=2 个广告家族特征（pagead、doubleclick pagead、yt3 proxy、旧端点）；
- * - 删除整条广告 item 及其后 divider，避免空白/黑框；
- * - 保留 WebView 引擎与低内存 range/subarray 重建方式。
+ * 说明：
+ * - /browse 只由本脚本处理，避免与 Enhance response 重复匹配；
+ * - 对所有 protobuf 层级中的直接 field #1 / #32 item 做广告特征判断，
+ *   以覆盖首页与非首页 browse 中的 Sponsored / Feed / companion item；
+ * - /player/ad_break 返回的是独立广告响应，直接返回空 protobuf message，
+ *   不影响 /player、/get_watch 等正常播放响应；
+ * - 双语字幕模块完全独立，本脚本不处理 timedtext / caption。
  */
 (() => {
   const TARGET = 49399797;
-  const MAX_SEARCH_DEPTH = 8;
+  const MAX_SEARCH_DEPTH = 10;
+  const url = ($request && $request.url) || '';
 
   const ABOUT = 'www.youtube.com/aboutthisad';
   const OLD_CORE = [
@@ -29,6 +29,14 @@
     'www.youtube.com/pagead/',
     'googleads.g.doubleclick.net/pagead/',
     'yt3.ggpht.com/proxy'
+  ];
+  const AD_UI = [
+    'ad_card_badge.eml-fe',
+    'ad_button.eml-fe',
+    'ad_image.eml-fe',
+    'feed_ad_extension_carousel.eml-fe',
+    'feed_ad_metadata.eml-fe',
+    'ad_badge.eml-fe'
   ];
 
   const TINY_LAYOUT = 'video_display_button_group_layout.eml-fe';
@@ -45,10 +53,12 @@
   const aboutBytes = ascii(ABOUT);
   const oldBytes = OLD_CORE.map(ascii);
   const broadBytes = BROAD.map(ascii);
+  const adUiBytes = AD_UI.map(ascii);
   const tinyLayoutBytes = ascii(TINY_LAYOUT);
   const prominenceBytes = ascii(PROMINENCE);
   const dividerBytes = ascii(DIVIDER);
   const normalThumbBytes = ascii(NORMAL_THUMB);
+  const pageadBytes = ascii('pagead');
 
   function readVarint(a, i, end) {
     let v = 0;
@@ -90,14 +100,20 @@
     }
 
     let hits = 0;
+    let uiHits = 0;
     for (let i = 0; i < oldBytes.length; i++) {
       if (containsRange(a, start, end, oldBytes[i])) hits++;
     }
     for (let i = 0; i < broadBytes.length; i++) {
       if (containsRange(a, start, end, broadBytes[i])) hits++;
     }
+    for (let i = 0; i < adUiBytes.length; i++) {
+      if (containsRange(a, start, end, adUiBytes[i])) uiHits++;
+    }
 
-    return { ad: hits >= 2, reason: 'markers', hits };
+    const hasPagead = containsRange(a, start, end, pageadBytes);
+    const ad = hits >= 2 || (hasPagead && uiHits >= 1) || uiHits >= 2;
+    return { ad, reason: ad ? (uiHits ? 'pagead+ad-ui' : 'markers') : 'none', hits: hits + uiHits };
   }
 
   function parseFields(a, start, end) {
@@ -194,7 +210,7 @@
         if (ev.ad) {
           drop[i] = true;
           ads++;
-          console.log(`[YT HomeFeed AdBlock v9] DROP AD field=${x.no} bytes=${x.pe - x.ps} hits=${ev.hits} reason=${ev.reason}`);
+          console.log(`[YT AdBlock v10] DROP FEED AD field=${x.no} bytes=${x.pe - x.ps} hits=${ev.hits} reason=${ev.reason}`);
           continue;
         }
       }
@@ -202,7 +218,7 @@
       if (isShell(a, x)) {
         drop[i] = true;
         shells++;
-        console.log(`[YT HomeFeed AdBlock v9] DROP SHELL bytes=${x.pe - x.ps}`);
+        console.log(`[YT AdBlock v10] DROP SHELL bytes=${x.pe - x.ps}`);
       }
     }
 
@@ -214,19 +230,19 @@
       if (drop[i - 1]) {
         drop[i] = true;
         dividers++;
-        console.log(`[YT HomeFeed AdBlock v9] DROP DIVIDER bytes=${x.pe - x.ps}`);
+        console.log(`[YT AdBlock v10] DROP DIVIDER bytes=${x.pe - x.ps}`);
       }
     }
 
     if (ads === 0 && shells === 0) {
-      return { changed: false, segs: [rangeSeg(start, end)], len: end - start, ads: 0, shells: 0, dividers: 0 };
+      return { changed: false, segs: [rangeSeg(start, end)], len: end - start, ads: 0, shells: 0, dividers: 0, genericAds: 0 };
     }
 
     const segs = [];
     for (let i = 0; i < f.length; i++) {
       if (!drop[i]) segs.push(rangeSeg(f[i].start, f[i].end));
     }
-    return { changed: true, segs, len: totalLen(segs), ads, shells, dividers };
+    return { changed: true, segs, len: totalLen(segs), ads, shells, dividers, genericAds: 0 };
   }
 
   function rewriteSearch(a, start, end, depth) {
@@ -237,12 +253,25 @@
     let ads = 0;
     let shells = 0;
     let dividers = 0;
+    let genericAds = 0;
     const segs = [];
 
     for (let i = 0; i < f.length; i++) {
       const x = f[i];
-      let child = null;
 
+      // 恢复原 Enhance 对非首页 browse 广告 item 的广泛处理：
+      // field #1 / #32 在任意有效 protobuf 容器内若出现明确广告特征，则删除整项。
+      if (x.wt === 2 && depth > 0 && (x.no === 1 || x.no === 32)) {
+        const ev = adEvidence(a, x.ps, x.pe);
+        if (ev.ad) {
+          changed = true;
+          genericAds++;
+          console.log(`[YT AdBlock v10] DROP GENERIC BROWSE AD depth=${depth} field=${x.no} bytes=${x.pe - x.ps} hits=${ev.hits} reason=${ev.reason}`);
+          continue;
+        }
+      }
+
+      let child = null;
       if (x.wt === 2 && x.no === TARGET) {
         child = rewriteFeedContainer(a, x.ps, x.pe);
       } else if (x.wt === 2 && depth < MAX_SEARCH_DEPTH) {
@@ -255,32 +284,41 @@
         segs.push(bytesSeg(varintBytes(child.len)));
         for (let j = 0; j < child.segs.length; j++) segs.push(child.segs[j]);
         changed = true;
-        ads += child.ads;
-        shells += child.shells;
-        dividers += child.dividers;
+        ads += child.ads || 0;
+        shells += child.shells || 0;
+        dividers += child.dividers || 0;
+        genericAds += child.genericAds || 0;
       } else {
         segs.push(rangeSeg(x.start, x.end));
       }
     }
 
-    return { changed, segs, len: totalLen(segs), ads, shells, dividers };
+    return { changed, segs, len: totalLen(segs), ads, shells, dividers, genericAds };
   }
 
   try {
+    // 独立广告 break：响应本身就是广告载荷。空 protobuf message 合法，直接让客户端拿不到伴随广告。
+    if (url.includes('/youtubei/v1/player/ad_break')) {
+      const input = $response.body instanceof Uint8Array ? $response.body : new Uint8Array($response.body || new ArrayBuffer(0));
+      console.log(`[YT AdBlock v10] BLOCK player/ad_break bytes=${input.length} -> 0`);
+      $done({ body: new Uint8Array(0) });
+      return;
+    }
+
     const input = $response.body instanceof Uint8Array ? $response.body : new Uint8Array($response.body);
-    console.log(`[YT HomeFeed AdBlock v9] START bytes=${input.length}`);
+    console.log(`[YT AdBlock v10] START browse bytes=${input.length}`);
 
     const plan = rewriteSearch(input, 0, input.length, 0);
     if (plan && plan.changed) {
       const out = emit(input, plan.segs, plan.len);
-      console.log(`[YT HomeFeed AdBlock v9] DONE ads=${plan.ads} shells=${plan.shells} dividers=${plan.dividers}, ${input.length} -> ${out.length}`);
+      console.log(`[YT AdBlock v10] DONE feedAds=${plan.ads} genericAds=${plan.genericAds} shells=${plan.shells} dividers=${plan.dividers}, ${input.length} -> ${out.length}`);
       $done({ body: out });
     } else {
-      console.log(`[YT HomeFeed AdBlock v9] PASS bytes=${input.length}`);
+      console.log(`[YT AdBlock v10] PASS browse bytes=${input.length}`);
       $done({});
     }
   } catch (e) {
-    console.log(`[YT HomeFeed AdBlock v9] ERROR ${e}`);
+    console.log(`[YT AdBlock v10] ERROR ${e}`);
     $done({});
   }
 })();
