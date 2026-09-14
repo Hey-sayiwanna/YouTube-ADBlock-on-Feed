@@ -23,6 +23,7 @@ jobs:
           curl -fsSL "https://raw.githubusercontent.com/Maasea/sgmodule/${SHA}/YouTube.Enhance.sgmodule" -o Upstream/Maasea/YouTube.Enhance.sgmodule
           curl -fsSL "https://raw.githubusercontent.com/Maasea/sgmodule/${SHA}/Script/Youtube/youtube.response.js" -o Upstream/Maasea/Script/Youtube/youtube.response.js
           curl -fsSL "https://raw.githubusercontent.com/Maasea/sgmodule/${SHA}/Script/Youtube/youtube.request.js" -o Upstream/Maasea/Script/Youtube/youtube.request.js
+          curl -fsSL "https://raw.githubusercontent.com/Maasea/sgmodule/${SHA}/LICENSE" -o Upstream/Maasea/LICENSE
           printf '%s\n' "$SHA" > Upstream/Maasea/UPSTREAM_COMMIT.txt
       - name: Commit vendored snapshot
         shell: bash
