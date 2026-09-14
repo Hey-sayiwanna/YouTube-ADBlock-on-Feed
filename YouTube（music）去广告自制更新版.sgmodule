@@ -1,22 +1,18 @@
 #!name=YouTube（music）去广告自制更新版
-#!desc=以 2026-09-03 之前固定版 Maasea YouTube (Music) Enhance 为完整基础，恢复原版全部 browse 去广告逻辑；对 /browse 在原版处理完成后继续追加自制 Home Feed v9 过滤，并单独拦截 player/ad_break 视频下方赞助卡片。双语字幕继续独立处理。
+#!desc=以 2026-09-03 之前固定版 Maasea YouTube (Music) Enhance 为完整基础，保留原版全部功能；/browse 由单一合并脚本处理，先执行自制 Home Feed v9 精确过滤，再交给原版 Enhance Browse 继续处理，避免两个 response 脚本争抢。双语字幕继续独立处理。
 #!category=YouTube
 #!system=ios
-#!version=2026.09.15.4
+#!version=2026.09.15.5
 #!arguments=屏蔽上传按钮:true,屏蔽选段按钮:true,屏蔽Shorts按钮:false,启用调试模式:false
-#!arguments-desc=- 屏蔽参数：[true, false] \n\n1. 双语字幕继续由独立的 YouTube-Bilingual-Subtitles-Surge 模块负责，本模块不提供字幕翻译开关。\n2. Maasea Enhance 固定为 2026-09-03 之前最后版本：65075cdb388fc5e3094afd7e7314c67b243f3525（2026-07-19）。\n3. /browse 只命中一个合并后的 response 脚本：先完整执行原版 Enhance browse 处理，再对处理后的 protobuf 继续执行自制 Home Feed v9，因此不会出现两个 response 脚本争抢。\n4. /player/ad_break 单独由自制脚本清空广告 protobuf，处理视频播放页下方“赞助”伴随广告。\n5. Enhance 内部 captionLang 强制为 off，避免与双语字幕功能重叠。
+#!arguments-desc=- 屏蔽参数：[true, false] \n\n1. 双语字幕继续由独立的 YouTube-Bilingual-Subtitles-Surge 模块负责，本模块不提供字幕翻译开关。\n2. Maasea Enhance 固定为 2026-09-03 之前最后版本：65075cdb388fc5e3094afd7e7314c67b243f3525（2026-07-19）。\n3. /browse 只命中一个合并 response 脚本：Home Feed v9 先在原始 protobuf 中删除已验证的 Sponsored item，再由原版 Enhance Browse 继续执行其完整过滤逻辑。\n4. 不再单独处理 /player/ad_break；恢复为迁移前原版 Enhance 功能边界，避免把合并问题误判成新增接口问题。\n5. Enhance 内部 captionLang 强制为 off，避免与双语字幕功能重叠。
 
 [Rule]
 AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
 AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP)),REJECT
 
 [Script]
-# 原版 Enhance 完整 response 逻辑（包含 browse） + 自制 Home Feed v9 后置补丁。
-# 对非 browse 接口与固定版原版 Enhance 行为一致；仅 browse 在原版完成后追加 v9。
-YouTube.Enhance.response.merged = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/(youtubei\/v1\/(browse|next|player|search|reel\/reel_watch_sequence|guide|account\/get_setting|get_watch|log_event|config))(\?(.*))?$,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.response.merged.js?v=20260915.4,argument="{\"captionLang\":\"off\",\"blockUpload\":{{{屏蔽上传按钮}}},\"blockImmersive\":{{{屏蔽选段按钮}}},\"blockShorts\":{{{屏蔽Shorts按钮}}},\"debug\":{{{启用调试模式}}}}"
-
-# 新版独立广告 break：不与 browse / player / get_watch 共用 response 脚本。
-YouTube.AdBreak.Block = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/player\/ad_break(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=webview,debug=true,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.HomeFeedAdBlock.js?v=20260915.11
+# 单一合并 response：browse 先执行 Home Feed v9，再执行固定版原版 Enhance；其他接口保持原版 Enhance 行为。
+YouTube.Enhance.response.merged = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/(youtubei\/v1\/(browse|next|player|search|reel\/reel_watch_sequence|guide|account\/get_setting|get_watch|log_event|config))(\?(.*))?$,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.response.merged.js?v=20260915.5,argument="{\"captionLang\":\"off\",\"blockUpload\":{{{屏蔽上传按钮}}},\"blockImmersive\":{{{屏蔽选段按钮}}},\"blockShorts\":{{{屏蔽Shorts按钮}}},\"debug\":{{{启用调试模式}}}}"
 
 # 原版 Enhance request 逻辑完整保留。
 YouTube.Enhance.request.init.pinned = type=http-request,pattern=^https?:\/\/[\w-]+\.googlevideo\.com\/initplayback.+&ack.*,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js,argument="{\"captionLang\":\"off\"}"
