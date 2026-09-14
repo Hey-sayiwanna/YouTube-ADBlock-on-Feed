@@ -33,17 +33,24 @@ jobs:
           marker = 'function ii(l){'
           if marker not in src:
               raise SystemExit('Cannot find ii() marker in pinned Enhance source')
-
           src = src.replace(marker, helper + '\n' + marker, 1)
 
           old = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let t=e.msgType.fromBinary(l.bodyBytes),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey});return{action:n?"body":"exit",bodyBytes:n?e.msgType.toBinary(t):void 0,state:l.state,changed:i}}'
-          new = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let a=l.bodyBytes,u=!1;if(e.path==="browse"){try{let c=YTCustomHomeFeedV9(a);c.changed&&(a=c.body,u=!0,console.log(`[YouTube merged browse] HomeFeed pre-filter removed ads=${c.ads} shells=${c.shells} dividers=${c.dividers}`))}catch(c){console.log(`[YouTube merged browse] HomeFeed pre-filter error: ${String(c)}`)}}let t=e.msgType.fromBinary(a),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey});return{action:n||u?"body":"exit",bodyBytes:n||u?e.msgType.toBinary(t):void 0,state:l.state,changed:i}}'
-
+          new = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let a=l.bodyBytes instanceof Uint8Array?l.bodyBytes:new Uint8Array(l.bodyBytes),u=!1;if(e.path==="browse"){try{let c=YTCustomHomeFeedV9(a);c.changed&&(a=c.body,u=!0,console.log(`[YouTube merged browse] HomeFeed pre-filter removed ads=${c.ads} shells=${c.shells} dividers=${c.dividers}`))}catch(c){console.log(`[YouTube merged browse] HomeFeed pre-filter error: ${String(c)}`)}}let t=e.msgType.fromBinary(a),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey});return{action:n||u?"body":"exit",bodyBytes:n||u?e.msgType.toBinary(t):void 0,state:l.state,changed:i}}'
           if old not in src:
               raise SystemExit('Pinned Enhance dispatcher signature changed; refusing unsafe build')
           src = src.replace(old, new, 1)
 
-          banner = '/* GENERATED FILE: custom Home Feed v9 pre-filter, then pinned Maasea Enhance browse. */\n'
+          # Force one-time invalidation of the adaptive ad-field cache. Broken merge builds may
+          # have persisted stale whiteNo/whiteEml decisions; keeping them makes the restored
+          # original /next and /browse handlers incorrectly trust ad containers.
+          cache_old = 'var oi="1.0";'
+          cache_new = 'var oi="1.1-merged-reset-20260915";'
+          if cache_old not in src:
+              raise SystemExit('Cannot find pinned Enhance ad cache version marker')
+          src = src.replace(cache_old, cache_new, 1)
+
+          banner = '/* GENERATED FILE: normalized custom Home Feed v9 pre-filter, then pinned Maasea Enhance; stale ad cache reset. */\n'
           out_path.write_text(banner + src, encoding='utf-8')
           print(f'Wrote {out_path} ({out_path.stat().st_size} bytes)')
           PY
@@ -56,7 +63,7 @@ jobs:
             exit 0
           fi
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.email '4189826+github-actions[bot]@users.noreply.github.com'
           git add Upstream/Maasea/Script/Youtube/youtube.response.merged.js
           git commit -m 'Build merged pinned Enhance browse response'
           git push
