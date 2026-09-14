@@ -1,0 +1,63 @@
+name: Build merged YouTube response
+
+on:
+  push:
+    paths:
+      - 'Upstream/Maasea/Script/Youtube/youtube.response.js'
+      - 'YouTube.HomeFeedExtra.js'
+      - '.github/workflows/build-merged-youtube-response.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build merged response script
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          src_path = Path('Upstream/Maasea/Script/Youtube/youtube.response.js')
+          helper_path = Path('YouTube.HomeFeedExtra.js')
+          out_path = Path('Upstream/Maasea/Script/Youtube/youtube.response.merged.js')
+
+          src = src_path.read_text(encoding='utf-8')
+          helper = helper_path.read_text(encoding='utf-8')
+
+          marker = 'function ii(l){'
+          if marker not in src:
+              raise SystemExit('Cannot find ii() marker in pinned Enhance source')
+
+          # Insert our Home Feed v9 helper immediately before the original dispatcher.
+          src = src.replace(marker, helper + '\n' + marker, 1)
+
+          old = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let t=e.msgType.fromBinary(l.bodyBytes),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey});return{action:n?"body":"exit",bodyBytes:n?e.msgType.toBinary(t):void 0,state:l.state,changed:i}}'
+          new = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let t=e.msgType.fromBinary(l.bodyBytes),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey}),r=n?e.msgType.toBinary(t):l.bodyBytes;if(e.path==="browse"){try{let c=YTCustomHomeFeedV9(r);c.changed&&(r=c.body,n=!0,console.log(`[YouTube merged browse] HomeFeed extra removed ads=${c.ads} shells=${c.shells} dividers=${c.dividers}`))}catch(c){console.log(`[YouTube merged browse] HomeFeed extra error: ${String(c)}`)}}return{action:n?"body":"exit",bodyBytes:n?r:void 0,state:l.state,changed:i}}'
+
+          if old not in src:
+              raise SystemExit('Pinned Enhance dispatcher signature changed; refusing unsafe build')
+          src = src.replace(old, new, 1)
+
+          banner = '/* GENERATED FILE: pinned Maasea Enhance browse first, then custom Home Feed v9 post-filter. */\n'
+          out_path.write_text(banner + src, encoding='utf-8')
+          print(f'Wrote {out_path} ({out_path.stat().st_size} bytes)')
+          PY
+
+      - name: Commit generated merged script
+        shell: bash
+        run: |
+          if git diff --quiet -- Upstream/Maasea/Script/Youtube/youtube.response.merged.js; then
+            echo 'Merged script already up to date.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Upstream/Maasea/Script/Youtube/youtube.response.merged.js
+          git commit -m 'Build merged pinned Enhance browse response'
+          git push
