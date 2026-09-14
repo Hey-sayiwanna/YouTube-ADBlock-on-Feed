@@ -1,20 +1,20 @@
 #!name=YouTube（music）去广告自制更新版
-#!desc=整合自制首页 Sponsored Feed 去广告与 Maasea YouTube (Music) Enhance（固定为 2026-09-03 之前最后版本）。本模块只负责 YouTube / YouTube Music 去广告及 Enhance 原有非字幕增强，不接管双语字幕翻译。
+#!desc=整合自制 Browse/Sponsored 去广告与 Maasea YouTube (Music) Enhance（固定为 2026-09-03 之前最后版本）。v10 恢复迁移前非首页 browse 广告过滤，并新增 player/ad_break 视频下方赞助卡片过滤；双语字幕继续独立处理。
 #!category=YouTube
 #!system=ios
-#!version=2026.09.15.2
+#!version=2026.09.15.3
 #!arguments=屏蔽上传按钮:true,屏蔽选段按钮:true,屏蔽Shorts按钮:false,启用调试模式:false
-#!arguments-desc=- 屏蔽参数：[true, false] \n\n1. 双语字幕功能继续由独立的 YouTube-Bilingual-Subtitles-Surge 模块负责，本模块不提供字幕翻译开关。\n2. Maasea Enhance 代码固定为 2026-09-03 之前最后提交：65075cdb388fc5e3094afd7e7314c67b243f3525（2026-07-19）。\n3. 首页 /browse 由自制 Feed v9 独占处理，避免与 Enhance 的 browse response 重复匹配。\n4. Enhance 内部 captionLang 强制为 off，防止与双语字幕逻辑发生功能重叠。
+#!arguments-desc=- 屏蔽参数：[true, false] \n\n1. 双语字幕功能继续由独立的 YouTube-Bilingual-Subtitles-Surge 模块负责，本模块不提供字幕翻译开关。\n2. Maasea Enhance 代码固定为 2026-09-03 之前最后提交：65075cdb388fc5e3094afd7e7314c67b243f3525（2026-07-19）。\n3. 所有 /browse 由自制 v10 单脚本处理：保留首页 v9 规则，并补回原 Enhance 的广泛 browse 广告识别，避免两个 response 脚本争抢。\n4. /player/ad_break 由同一自制脚本单独清空广告 protobuf，处理视频下方“赞助”伴随广告。\n5. Enhance 内部 captionLang 强制为 off，防止与双语字幕逻辑发生功能重叠。
 
 [Rule]
 AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
 AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP)),REJECT
 
 [Script]
-# 自制首页 Sponsored / Feed 广告过滤：独占 browse，避免和 Enhance browse 脚本互相抢响应
-YouTube.HomeFeedAdBlock.v9 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/browse(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=webview,debug=true,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.HomeFeedAdBlock.js?v=20260903.9
+# Browse v10：首页 Sponsored + 非首页 browse 广告；同时处理 player/ad_break 伴随广告
+YouTube.BrowseAndAdBreak.v10 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(browse|player\/ad_break)(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=webview,debug=true,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.HomeFeedAdBlock.js?v=20260915.10
 
-# Maasea YouTube (Music) Enhance：使用 2026-09-03 之前固定快照，刻意排除 browse；字幕翻译强制关闭
+# Maasea YouTube (Music) Enhance：固定历史快照；browse 由上面的 v10 接管，避免同一 response 被两个脚本匹配；字幕翻译强制关闭
 YouTube.Enhance.response.pinned = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/(youtubei\/v1\/(next|player|search|reel\/reel_watch_sequence|guide|account\/get_setting|get_watch|log_event|config))(\?(.*))?$,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.response.js,argument="{\"captionLang\":\"off\",\"blockUpload\":{{{屏蔽上传按钮}}},\"blockImmersive\":{{{屏蔽选段按钮}}},\"blockShorts\":{{{屏蔽Shorts按钮}}},\"debug\":{{{启用调试模式}}}}"
 YouTube.Enhance.request.init.pinned = type=http-request,pattern=^https?:\/\/[\w-]+\.googlevideo\.com\/initplayback.+&ack.*,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js,argument="{\"captionLang\":\"off\"}"
 YouTube.Enhance.request.log_event.pinned = type=http-request,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/log_event,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js
