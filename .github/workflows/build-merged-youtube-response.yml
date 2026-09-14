@@ -34,7 +34,6 @@ jobs:
           if marker not in src:
               raise SystemExit('Cannot find ii() marker in pinned Enhance source')
 
-          # Insert our Home Feed v9 helper immediately before the original dispatcher.
           src = src.replace(marker, helper + '\n' + marker, 1)
 
           old = 'function ii(l){let e=Mi.find(r=>l.url.includes(r.path));if(!e)return null;if(l.bodyBytes==null)return{action:"exit",state:l.state,changed:!1};let t=e.msgType.fromBinary(l.bodyBytes),{bodyChanged:n,stateChanged:i}=e.handler(t,{params:l.params,state:l.state,platformKey:l.platformKey});return{action:n?"body":"exit",bodyBytes:n?e.msgType.toBinary(t):void 0,state:l.state,changed:i}}'
@@ -52,7 +51,7 @@ jobs:
       - name: Commit generated merged script
         shell: bash
         run: |
-          if git diff --quiet -- Upstream/Maasea/Script/Youtube/youtube.response.merged.js; then
+          if git diff --quiet -- Upstream/Maasea/Script/Youtube/youtube.response.merged.js && git ls-files --error-unmatch Upstream/Maasea/Script/Youtube/youtube.response.merged.js >/dev/null 2>&1; then
             echo 'Merged script already up to date.'
             exit 0
           fi
