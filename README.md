@@ -2,9 +2,9 @@
 
 这是一个面向 **Surge / iOS / iPadOS** 的 YouTube & YouTube Music 去广告模块。
 
-当前版本的原则很简单：**原版 Enhance 能做的去广告能力一项不删，在它原有处理完成后，再补上我们自己抓包修出来的首页 Sponsored 过滤。**
+当前版本的原则是：**原版 Enhance 的功能不删，只解决 `/browse` 合并时的冲突问题，并保留我们自己抓包修出来的首页 Sponsored 补丁。**
 
-也就是说，本项目不是用“自制规则”替代 Maasea，而是以固定历史版 Maasea `YouTube (Music) Enhance` 为基础，在不影响双语字幕模块的前提下追加自己的修复。
+本项目不是用自制规则替代 Maasea，而是以固定历史版 Maasea `YouTube (Music) Enhance` 为基础，在同一个 response 脚本里把 Home Feed v9 和原版 Browse 串起来执行，避免 Surge 多个 response 脚本争抢同一个响应。
 
 ## 固定的上游版本
 
@@ -46,27 +46,27 @@ https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/You
 
 ## 当前执行结构
 
-### 1. `/browse`：原版 Enhance 先处理，再执行自制 Home Feed v9
+### 1. `/browse`：Home Feed v9 先过滤，再交给原版 Enhance
 
-这是本版本最重要的调整。
+`2026.09.15.4` 曾采用“原版 Enhance Browse 先处理，再把重新序列化后的 protobuf 交给 Home Feed v9”的后置结构。实际测试发现 Surge 虽然显示 `YouTube.Enhance.response.merged` 已修改响应，但抓到的首页 HAR 中仍保留完整 Sponsored item，说明该后置合并路径没有可靠地把 Home Feed v9 的结果带到最终响应。
 
-之前为了避免 Surge 的多个 `http-response` 脚本争抢同一个 `/browse` 响应，我们曾经把 Enhance 的 `browse` 从匹配列表里去掉，只让自制首页脚本处理。这会丢失原版 Enhance 对其他 Browse 场景的广告过滤能力。
-
-现在已经改为 **单一合并 response 脚本**：
+`2026.09.15.5` 改为更直接的单脚本顺序：
 
 ```text
-/youtubei/v1/browse
+/youtubei/v1/browse 原始 protobuf
         ↓
-固定版 Maasea Enhance 原版 Browse 解析/过滤
+Home Feed v9 在原始二进制中先删除已验证的 Sponsored / Feed item
         ↓
-把原版处理后的 protobuf 再交给 Home Feed v9
+固定版 Maasea Enhance 使用自己的原版 Browse protobuf 解析器继续处理
         ↓
-补充删除原版仍会漏掉的首页 Sponsored / Feed 广告与空壳
-        ↓
-一次性返回给 YouTube
+一次性序列化并返回给 YouTube
 ```
 
-这样既恢复了迁移前原版 Enhance 的 Browse 去广告能力，又保留我们根据真实 iOS HAR 抓包修出来的首页广告补丁，同时只有一个 response 脚本命中 `/browse`，不会发生脚本抢处理权的问题。
+这样做有三个目的：
+
+- Home Feed v9 直接面对我们已经验证过的原始 `/browse` protobuf，不再依赖原版重新序列化后的结构；
+- 原版 Enhance 的 Browse 处理仍然完整执行，原版功能没有删除；
+- Surge 侧仍然只有一个 `http-response` 脚本命中 `/browse`，不会重新出现两个脚本抢处理权的问题。
 
 生成后的合并脚本位于：
 
@@ -74,18 +74,11 @@ https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/You
 Upstream/Maasea/Script/Youtube/youtube.response.merged.js
 ```
 
-它由仓库中的构建工作流自动从固定版 `youtube.response.js` 生成，执行顺序是：
+它由仓库构建工作流从固定版 `youtube.response.js` 与 `YouTube.HomeFeedExtra.js` 自动生成。
 
-```text
-原版 Enhance Browse
-→ 自制 Home Feed v9
-```
+### 2. 其他 Enhance 接口：保持固定版原版能力
 
-而不是用自制算法去近似替代原版 Browse 逻辑。
-
-### 2. 其他 Enhance 接口：保持原版能力
-
-以下接口继续走固定版 Maasea Enhance：
+以下接口继续由固定版 Maasea Enhance 原版代码处理：
 
 ```text
 /player
@@ -99,30 +92,13 @@ Upstream/Maasea/Script/Youtube/youtube.response.merged.js
 /config
 ```
 
-播放器广告、Shorts 广告、搜索/推荐内容处理、后台播放、画中画及其他 Enhance 原有能力继续保留。
+播放器广告、Shorts 广告、搜索/推荐内容处理、后台播放、画中画以及其他 Enhance 原有逻辑均继续保留。
 
-### 3. `/player/ad_break`：单独处理视频下方“赞助”伴随广告
+### 3. 不再单独处理 `/player/ad_break`
 
-2026-09-15 的实际抓包发现，新版 YouTube 会额外请求：
+之前根据一次播放页抓包临时增加过 `/youtubei/v1/player/ad_break` 的独立拦截。进一步对比迁移前后的行为后，当前判断是：播放页出现“赞助”更可能是合并阶段破坏了原版去广告链路，而不是必须新增一个独立广告接口规则。
 
-```text
-/youtubei/v1/player/ad_break
-```
-
-该响应中可以直接下发播放页面视频下方的 Sponsored / Companion 广告卡片，例如：
-
-```text
-aboutthisad
-pagead/adview
-pcs/activeview
-yt3.ggpht.com/proxy
-ad_card_badge.eml-fe
-ad_button.eml-fe
-ad_image.eml-fe
-feed_ad_extension_carousel.eml-fe
-```
-
-这条接口不属于旧版 Enhance 的原有匹配范围，所以现在单独处理，不与 `/browse`、`/player`、`/get_watch` 共用脚本。
+因此从 `2026.09.15.5` 开始，已经移除该临时 `player/ad_break` response 脚本，恢复到迁移前原版 Enhance 的功能边界。后续如果在原版链路完整恢复后仍能稳定复现该接口独立下发广告，再单独根据 HAR 处理。
 
 ## 与双语字幕模块共存
 
@@ -135,7 +111,6 @@ feed_ad_extension_carousel.eml-fe
 - 本去广告模块不提供字幕翻译开关；
 - Enhance 内部 `captionLang` 强制为 `off`；
 - `/browse` 只有本仓库的合并 response 脚本处理；
-- `/player/ad_break` 只有独立广告脚本处理；
 - 双语字幕继续负责它自己的字幕 request / `timedtext` 等链路；
 - 不把双语字幕翻译逻辑合并进本仓库。
 
@@ -144,21 +119,24 @@ feed_ad_extension_carousel.eml-fe
 ## 安装
 
 1. 删除或关闭原来的官方/上游 `Youtube (Music) Enhance` 模块，避免和本仓库重复匹配。
-2. 不需要删除你的双语字幕模块。
-3. 使用上面的任一订阅地址安装本模块。
-4. 完全退出 YouTube / YouTube Music 后重新打开。
-5. 建议开启 Surge QUIC 屏蔽；本模块本身也会屏蔽 `youtubei.googleapis.com` 和 `*.googlevideo.com` 的 UDP/QUIC，以保证 MITM 与脚本处理稳定生效。
+2. 保留你的双语字幕模块，不需要修改。
+3. 使用上面的任一订阅地址安装或更新本模块。
+4. 确认版本为 `2026.09.15.5`。
+5. 完全退出 YouTube / YouTube Music 后重新打开。
+6. 建议开启 Surge QUIC 屏蔽；本模块本身也会屏蔽 `youtubei.googleapis.com` 和 `*.googlevideo.com` 的 UDP/QUIC，以保证 MITM 与脚本处理稳定生效。
 
 ## 更新记录
 
 ### 2026-09-15
 
-- **2026.09.15.4**：恢复固定版 Maasea Enhance 的原版 `/browse` 处理，不再使用自制通用算法替代原版 Browse 去广告。
-- 新增 `youtube.response.merged.js`：对 `/browse` 先执行原版 Enhance，再在原版输出结果上继续执行 Home Feed v9，避免两个 response 脚本争抢同一响应。
-- 保留固定版 Enhance 的其他 response/request 功能，不删减原版能力。
-- `/player/ad_break` 继续单独处理，用于去除视频播放页下方的 Sponsored / Companion 广告卡片。
-- Enhance 内置字幕翻译保持强制 `off`，双语字幕仓库不做任何修改。
-- 新旧两个模块订阅地址继续同步，老用户不用换链接也能收到更新。
+- **2026.09.15.5**：修复合并版 `/browse` 后置补丁没有可靠生效的问题。改为 Home Feed v9 直接在原始 `/browse` protobuf 上先过滤，再交给固定版原版 Enhance Browse 继续执行。
+- 已用最新实测首页 HAR 复核：该 HAR 中仍包含一个 `field #32` Sponsored item，带 `aboutthisad` 与 `pagead/adview`，Home Feed v9 对这份数据应删除该完整 item。
+- 移除临时 `/player/ad_break` 独立处理，先恢复迁移前原版 Enhance 功能边界。
+- 原版 Enhance 的 `/browse`、`/player`、`/get_watch`、`/next`、搜索、Shorts、Guide、设置、request 等逻辑继续完整保留。
+- Enhance 内置字幕翻译继续强制 `off`，双语字幕仓库不做任何修改。
+- 新旧两个模块订阅地址继续同步，老用户无需更换链接。
+
+- **2026.09.15.4**：首次生成单一 `youtube.response.merged.js`，尝试在原版 Enhance Browse 后追加 Home Feed v9；实测发现该后置路径存在未生效问题，已由 `.5` 修正。
 
 ### 2026-09-03
 
