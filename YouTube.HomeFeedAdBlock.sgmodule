@@ -1,23 +1,23 @@
 #!name=YouTube（music）去广告自制更新版
-#!desc=2026-09-15 v16：紧急回滚 v15 的 initplayback UMP 响应裁剪，恢复正常视频播放；保留高速 HomeFeed、/next companion 清理、get_watch 与 ad_break 兜底。双语字幕独立。
+#!desc=2026-09-15 v17：保持正常视频与高速 HomeFeed；彻底撤销 UMP response 裁剪；依据 #48283 ad_break HAR 精确保留控制信封并删除 field 10 广告交互与 field 777 广告 UI/companion。
 #!category=YouTube
 #!system=ios
-#!version=2026.09.15.16
+#!version=2026.09.15.17
 #!arguments=屏蔽上传按钮:true,屏蔽选段按钮:true,屏蔽Shorts按钮:false,启用调试模式:false
-#!arguments-desc=- 屏蔽参数：[true, false] \n\n1. /browse 继续使用稳定 HomeFeed v9 + JSC，保持快速启动。\n2. 已撤销 v15 的 initplayback HTTP-response UMP 裁剪：实测会破坏正常视频播放，说明同一 UMP 会话内媒体/控制分片存在共享依赖，不能按“首个视频 ID 正常、后续 ID 广告”直接删除。\n3. initplayback 仅恢复固定 Maasea request 逻辑，不再修改其 UMP response。\n4. /next 继续清理 companion Sponsored；/get_watch 与 /player/ad_break 保留兜底。\n5. Maasea 65075cdb 继续处理其余接口；captionLang 强制 off，双语字幕独立。
+#!arguments-desc=- 屏蔽参数：[true, false] \n\n1. /browse 继续稳定 HomeFeed v9 + JSC。\n2. 不再注册任何 initplayback HTTP-response 脚本，避免 v15 导致正常视频失效；initplayback 仅由固定 Maasea request 处理。\n3. /player/ad_break v3 不再返回空响应：实测 #48283 顶层 field 10 含 aboutthisad/pagead/aclk/proxy，field 777 含 AD_PARENT_CONTAINER 与 ad_* EML companion UI；仅删除 10/777，保留 field 1/8 控制信封。\n4. /next 继续清理 companion Sponsored；/get_watch 保留旧链路兜底。\n5. captionLang 强制 off，双语字幕独立。
 
 [Rule]
 AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
 AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP)),REJECT
 
 [Script]
-YouTube.HomeFeed.STABLE-v9-JSC = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/browse(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.HomeFeedAdBlock.js?v=20260915.16
-YouTube.GetWatchAdBlock.HAR-v1-JSC = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/get_watch(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.GetWatchAdBlock.js?v=20260915.16
-YouTube.NextAdBlock.HAR-v3-JSC = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/next(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.NextAdBlock.js?v=20260915.16
-YouTube.AdBreakBlock.v2 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/player\/ad_break(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.AdBreakBlock.js?v=20260915.16
-YouTube.Enhance.response.pinned-v16 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(player|search|reel\/reel_watch_sequence|guide|account\/get_setting|log_event|config)(\?(.*))?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.response.js?v=20260915.16,argument="{\"captionLang\":\"off\",\"blockUpload\":{{{屏蔽上传按钮}}},\"blockImmersive\":{{{屏蔽选段按钮}}},\"blockShorts\":{{{屏蔽Shorts按钮}}},\"debug\":{{{启用调试模式}}}}"
-YouTube.Enhance.request.init.pinned-v16 = type=http-request,pattern=^https?:\/\/[\w-]+\.googlevideo\.com\/initplayback.+&ack.*,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js?v=20260915.16,argument="{\"captionLang\":\"off\"}"
-YouTube.Enhance.request.log_event.pinned-v16 = type=http-request,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/log_event,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js?v=20260915.16
+YouTube.HomeFeed.STABLE-v9-JSC = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/browse(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.HomeFeedAdBlock.js?v=20260915.17
+YouTube.GetWatchAdBlock.HAR-v1-JSC = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/get_watch(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.GetWatchAdBlock.js?v=20260915.17
+YouTube.NextAdBlock.HAR-v3-JSC = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/next(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.NextAdBlock.js?v=20260915.17
+YouTube.AdBreakBlock.HAR-v3-JSC = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/player\/ad_break(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/YouTube.AdBreakBlock.js?v=20260915.17
+YouTube.Enhance.response.pinned-v17 = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(player|search|reel\/reel_watch_sequence|guide|account\/get_setting|log_event|config)(\?(.*))?$,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.response.js?v=20260915.17,argument="{\"captionLang\":\"off\",\"blockUpload\":{{{屏蔽上传按钮}}},\"blockImmersive\":{{{屏蔽选段按钮}}},\"blockShorts\":{{{屏蔽Shorts按钮}}},\"debug\":{{{启用调试模式}}}}"
+YouTube.Enhance.request.init.pinned-v17 = type=http-request,pattern=^https?:\/\/[\w-]+\.googlevideo\.com\/initplayback.+&ack.*,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,debug=false,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js?v=20260915.17,argument="{\"captionLang\":\"off\"}"
+YouTube.Enhance.request.log_event.pinned-v17 = type=http-request,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/log_event,requires-body=1,max-size=-1,binary-body-mode=1,engine=jsc,script-path=https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/Upstream/Maasea/Script/Youtube/youtube.request.js?v=20260915.17
 
 [MITM]
 hostname = %APPEND% *.googlevideo.com, youtubei.googleapis.com
