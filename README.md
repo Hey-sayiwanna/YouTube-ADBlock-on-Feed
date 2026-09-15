@@ -46,14 +46,24 @@ https://raw.githubusercontent.com/Maasea/sgmodule/master/YouTube.Enhance.sgmodul
 
 ### Surge 模块顺序
 
-请在 Surge 的模块列表中将 **本模块（YouTube Home Feed AdBlock）放置在 Maasea / Youtube (Music) Enhance 模块的下方**。这是目前实际测试可用的组合与顺序；两个模块需要保持独立启用，不建议合并成单个模块。
+请在 Surge 的模块列表中将 **本模块（YouTube Home Feed AdBlock）放置在 Maasea / Youtube (Music) Enhance 模块的下方**。这是目前实际测试可用的组合与顺序。
 
-推荐顺序：
+如果还需要使用 **YouTube 双语字幕**，请将双语字幕模块放在这两个去广告模块的**最上方**。双语字幕模块的安装、使用方法及更新请查看我的另一个专门仓库：
 
 ```text
-Youtube (Music) Enhance（Maasea）
-↓
-YouTube Home Feed AdBlock（本模块）
+https://github.com/Hey-sayiwanna/YouTube-Bilingual-Subtitles-Surge
 ```
 
-按上述顺序启用后，由本模块补充处理首页 Sponsored / Feed 广告，Maasea Enhance 负责其原有的 YouTube / YouTube Music 去广告与增强功能。
+三个模块同时使用时，推荐在 Surge 中保持以下顺序：
+
+```text
+YouTube 双语字幕（最上方）
+↓
+Youtube (Music) Enhance（Maasea）
+↓
+YouTube Home Feed AdBlock（本模块，最下方）
+```
+
+按上述顺序启用后，由本模块补充处理首页 Sponsored / Feed 广告，Maasea Enhance 负责其原有的 YouTube / YouTube Music 去广告与增强功能，双语字幕模块独立负责字幕处理。
+
+> **注意：以上几个模块必须保持为独立模块使用，请勿合并成一个 `.sgmodule`。实际测试中，将这些功能合并到同一个模块后可能导致脚本匹配或执行顺序发生变化，从而造成首页去广告、视频去广告或双语字幕等功能失效。**
