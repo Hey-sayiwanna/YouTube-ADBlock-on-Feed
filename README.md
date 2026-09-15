@@ -1,6 +1,6 @@
 # YouTube Home Feed AdBlock for Surge
 
-这是一个独立维护的 YouTube 首页推荐流去广告模块，面向 iPhone 与 iPad，专门处理 YouTube 首页 `/youtubei/v1/browse` 中的 Sponsored / Feed 广告。
+这是一个独立维护的 YouTube 首页推荐流去广告模块，面向 iPhone 与 iPad，专门处理 YouTube 首页中的 Sponsored / Feed 广告，仅支持surge。
 
 
 ## 模块订阅地址
@@ -13,11 +13,10 @@ https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/You
 
 ## 安装
 
-1. 删除 Surge 中旧的“ YouTube首页去广告 ”测试模块，避免多个 `/browse` response 脚本重复匹配。
-2. 使用上面的订阅地址安装本模块。
-3. 开启模块与 Surge MITM，安装并完全信任 Surge CA 证书，同时建议屏蔽 QUIC。
-4. 如果同时使用 YouTube Enhance 与双语字幕模块，请保持当前已验证可用的模块生效顺序：本项目负责 `/browse`，Enhance 继续负责 `/player`、`/get_watch`、`/next` 等接口。
-5. 完全退出 YouTube 后重新打开，再刷新首页测试。
+1. 使用上面的订阅地址安装本模块。
+2. 开启模块与 Surge MITM，安装并完全信任 Surge CA 证书，同时建议屏蔽 QUIC。
+3. 如果同时使用 YouTube Enhance 与双语字幕模块，请保持当前已验证可用的模块生效顺序，见本文章最后。
+4. 完全退出 YouTube 后重新打开，再刷新首页测试。
 
 
 ## 更新日志
