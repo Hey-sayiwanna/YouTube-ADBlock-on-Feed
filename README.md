@@ -34,3 +34,26 @@ https://raw.githubusercontent.com/Hey-sayiwanna/YouTube-ADBlock-on-Feed/main/You
 - **v5**：移除 Surge JSC 不支持的 `TextEncoder`，修复脚本执行中断。
 - **v1-v4**：根据多份真实 HAR 逐步定位 iOS Feed Sponsored 的 protobuf 结构与广告特征。
 
+## ⚠️ 重要：需配合 Maasea 的 YouTube Enhance 使用
+
+本模块主要用于补充去除 YouTube 首页 `/browse` 中的 Sponsored / Feed 广告。若需要更完整地去除 YouTube 首页及视频播放等位置的广告，请同时安装并启用 **Maasea 作者的 Youtube (Music) Enhance** 模块。
+
+Maasea 官方 YouTube Enhance 模块：
+
+```text
+https://raw.githubusercontent.com/Maasea/sgmodule/master/YouTube.Enhance.sgmodule
+```
+
+### Surge 模块顺序
+
+请在 Surge 的模块列表中将 **本模块（YouTube Home Feed AdBlock）放置在 Maasea / Youtube (Music) Enhance 模块的下方**。这是目前实际测试可用的组合与顺序；两个模块需要保持独立启用，不建议合并成单个模块。
+
+推荐顺序：
+
+```text
+Youtube (Music) Enhance（Maasea）
+↓
+YouTube Home Feed AdBlock（本模块）
+```
+
+按上述顺序启用后，由本模块补充处理首页 Sponsored / Feed 广告，Maasea Enhance 负责其原有的 YouTube / YouTube Music 去广告与增强功能。
